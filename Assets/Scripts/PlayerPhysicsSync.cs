@@ -15,31 +15,20 @@ public class PlayerPhysicsSync : MonoBehaviourPun
     private float client_timer;
     private uint client_tick_number;
     private uint client_last_received_state_tick;
-    private uint client_last_sent_state_tick;
     private const int c_client_buffer_size = 1024;
     private PlayerSyncStructs.ClientState[] client_state_buffer; // client stores predicted moves here
     private PlayerSyncStructs.Inputs[] client_input_buffer; // client stores predicted inputs here
     private Queue<PlayerSyncStructs.StateMessage> client_state_msgs;
-    private Vector3 client_pos_error;
-    private Quaternion client_rot_error;
     public GameObject playerPrefab;
     private Rigidbody proxy_client_player;
-    private float start_smooth_speed = 0;
 
-    private float server_lag = 0;
-
-    private uint client_tick_accumulator;
-    public Queue<uint> client_last_input_tick;
-
-    private Queue<PlayerSyncStructs.InputMessage> queue_input_msgs;
-
+    private uint client_tick_accumulator; 
 
     // server specific
     public uint server_snapshot_rate;
     private uint server_tick_number;
     private uint server_tick_accumulator;
     private Queue<PlayerSyncStructs.InputMessage> server_input_msgs;
-    private float client_input_lag = 0;
 
     private void Start()
     {
@@ -49,17 +38,10 @@ public class PlayerPhysicsSync : MonoBehaviourPun
         this.client_state_buffer = new PlayerSyncStructs.ClientState[c_client_buffer_size];
         this.client_input_buffer = new PlayerSyncStructs.Inputs[c_client_buffer_size];
         this.client_state_msgs = new Queue<PlayerSyncStructs.StateMessage>();
-        this.queue_input_msgs = new Queue<PlayerSyncStructs.InputMessage>();
-        this.client_last_input_tick = new Queue<uint>();
-
-        this.client_pos_error = Vector3.zero;
-        this.client_rot_error = Quaternion.identity;
 
         this.server_tick_number = 0;
         this.server_tick_accumulator = 0;
         this.server_input_msgs = new Queue<PlayerSyncStructs.InputMessage>();
-
-        start_smooth_speed = smoothing_speed;
 
         Application.targetFrameRate = 100; //limit frame rate to 100 when in online so we don't overdue our message limits since the snapshot rate is related to frame rate
         // THIS CAN AND SHOULD BE FRAME INDEPENDENT TO REMOVE THIS RESTRICTION OTHERWISE YOU WILL OVERUSE YOUR NETWORK BANDWITH
@@ -134,7 +116,6 @@ public class PlayerPhysicsSync : MonoBehaviourPun
 
             if (inputs.submitButon == 1)
             {
-                client_last_input_tick.Enqueue(client_tick_number);
                 proxy_client_player.position = client_rigidbody.position;
                 proxy_client_player.rotation = client_rigidbody.rotation;
                 proxy_client_player.velocity = client_rigidbody.velocity;
@@ -171,7 +152,6 @@ public class PlayerPhysicsSync : MonoBehaviourPun
                 }
 
                 SendServerMessage(input_msg);
-                this.client_last_sent_state_tick = client_tick_number;
             }
 
         }
@@ -187,11 +167,6 @@ public class PlayerPhysicsSync : MonoBehaviourPun
             }
 
             this.client_last_received_state_tick = recieved_state_msg.tick_number;
-
-            //Correct only if the newest message is newer than our last input and ten ticks (buffer in case of delay with large group with ping)
-
-            if (client_last_input_tick.Count > 0)
-                client_last_input_tick.Dequeue();
 
             uint buffer_slot = recieved_state_msg.tick_number % c_client_buffer_size;
             Vector3 position_error = recieved_state_msg.position - this.client_state_buffer[buffer_slot].position;
@@ -337,11 +312,6 @@ public class PlayerPhysicsSync : MonoBehaviourPun
         this.server_tick_accumulator = server_tick_accumulator;
     }
 
-    private System.Collections.IEnumerator ReturnToSmooth()
-    {
-        yield return new WaitForSeconds(0.3f);
-        smoothing_speed = start_smooth_speed;
-    }
     private void OnDisable()
     {
         if (proxy_client_player != null)
@@ -398,7 +368,6 @@ public class PlayerPhysicsSync : MonoBehaviourPun
         input_msg.start_tick_number = (uint)startTick;
         input_msg.position = pos;
         input_msg.inputs = inputList;
-        client_input_lag = Mathf.Abs((float)(PhotonNetwork.Time - info.SentServerTime));
         if (this.server_input_msgs != null)
             this.server_input_msgs.Enqueue(input_msg);
     }
@@ -419,7 +388,6 @@ public class PlayerPhysicsSync : MonoBehaviourPun
         state_msg.rotation = rot;
         state_msg.velocity = vel;
         state_msg.angular_velocity = angVel;
-        server_lag = Mathf.Abs((float)(PhotonNetwork.Time - info.SentServerTime));
         if (this.client_state_msgs != null)
             this.client_state_msgs.Enqueue(state_msg);
     }

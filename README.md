@@ -11,3 +11,7 @@ I have commented throughout the code marking where you need to apply your game's
 Hopefully this example can benefit someone.
 
 Twitter: https://twitter.com/ColeChittim
+
+# 2022 Update:
+I recently completely did a rework of my game Jelly Brawl's networking using Photon's new framework fusion and it makes the problem of authoritative physics as simple as adding a component to networked physics objects. If your struggling with this in your project or considering tackling this in an upcoming project I recommend checking it out.
+https://doc.photonengine.com/en-us/fusion/current/getting-started/fusion-intro
